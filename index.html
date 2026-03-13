@@ -8,49 +8,50 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    /* Zorg dat de printweergave goed werkt */
+    /* Zorg dat de printweergave goed werkt en verberg overbodige elementen */
     @media print {
       .print\:hidden { display: none !important; }
       body { background-color: white !important; }
     }
     [v-cloak] { display: none; }
+    /* Voorkom horizontaal scrollen op smalle mobiele schermen */
+    body { overflow-x: hidden; }
   </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-900">
 
   <div id="app" v-cloak>
     
-    <div v-if="printingBusId" class="p-8 max-w-2xl mx-auto bg-white text-black">
+    <div v-if="printingBusId" class="p-4 md:p-8 max-w-2xl mx-auto bg-white text-black">
       <div class="print:hidden mb-8">
         <button @click="printingBusId = null" class="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors font-medium">
           <i data-lucide="arrow-left" class="w-4 h-4"></i> Terug naar overzicht
         </button>
       </div>
       <div class="flex items-center justify-between border-b-2 border-black pb-4 mb-6">
-        <h1 class="text-4xl font-bold flex items-center gap-3">
-          <i data-lucide="bus" class="w-10 h-10"></i> {{ busToPrint.name }}
+        <h1 class="text-3xl md:text-4xl font-bold flex items-center gap-3">
+          <i data-lucide="bus" class="w-8 h-8 md:w-10 md:h-10"></i> {{ busToPrint.name }}
         </h1>
         <div class="text-right">
           <p class="text-gray-800 font-bold">{{ appTitle }}</p>
           <p v-if="appSubtitle" class="text-gray-600 text-sm">{{ appSubtitle }}</p>
           <p v-if="appDate" class="text-gray-500 text-xs italic">{{ formatDateToDutch(appDate) }}</p>
           <p class="text-gray-800 text-xs mt-1 font-semibold">Vertrek: {{ departureTime }} | Aankomst: {{ arrivalTime }}</p>
-          <p class="text-xs mt-1 text-gray-400">Geprint op: {{ new Date().toLocaleDateString('nl-NL') }}</p>
         </div>
       </div>
       
-      <div class="grid grid-cols-3 gap-4 mb-8 bg-gray-100 p-4 rounded-lg font-semibold text-lg">
-        <div class="text-center"><p class="text-gray-500 text-sm">Totale Capaciteit</p><p>{{ busToPrint.capacity }}</p></div>
-        <div class="text-center"><p class="text-gray-500 text-sm">Bezette Plaatsen</p><p>{{ printTotalUsed }}</p></div>
+      <div class="grid grid-cols-3 gap-2 md:gap-4 mb-8 bg-gray-100 p-4 rounded-lg font-semibold text-sm md:text-lg">
+        <div class="text-center"><p class="text-gray-500 text-xs md:text-sm">Capaciteit</p><p>{{ busToPrint.capacity }}</p></div>
+        <div class="text-center"><p class="text-gray-500 text-xs md:text-sm">Bezet</p><p>{{ printTotalUsed }}</p></div>
         <div class="text-center">
-          <p class="text-gray-500 text-sm">Vrije Plaatsen</p>
+          <p class="text-gray-500 text-xs md:text-sm">Vrij</p>
           <p :class="printFreeSeats < 0 ? 'text-red-600' : 'text-green-600'">{{ printFreeSeats }}</p>
         </div>
       </div>
 
-      <h2 class="text-2xl font-bold mb-4">Ingedeelde Groepen</h2>
+      <h2 class="text-xl md:text-2xl font-bold mb-4">Ingedeelde Groepen</h2>
       <template v-if="printValidGroups.length > 0">
-        <table class="w-full text-left border-collapse">
+        <table class="w-full text-left border-collapse text-sm md:text-base">
           <thead>
             <tr class="border-b-2 border-gray-300">
               <th class="py-2">Groepsnaam</th>
@@ -72,81 +73,89 @@
       <p v-else class="text-gray-500 italic">Er zijn nog geen groepen aan deze bus toegewezen.</p>
     </div>
 
-    <div v-else class="min-h-screen p-4 md:p-8 transition-all">
+    <div v-else class="min-h-screen p-2 md:p-8 transition-all">
       <div class="max-w-7xl mx-auto">
         
-        <header class="mb-8 flex flex-col gap-6 bg-blue-600 text-white p-6 md:p-8 rounded-xl shadow-lg border-b-4 border-blue-700">
-          <div class="flex items-center gap-4 md:gap-6 w-full">
-            <i data-lucide="bus" class="w-14 h-14 flex-shrink-0 hidden md:block text-blue-100 drop-shadow-md"></i>
-            <i data-lucide="bus" class="w-10 h-10 flex-shrink-0 md:hidden text-blue-100"></i>
-            <div class="flex-grow w-full">
-              <input type="text" v-model="appTitle" class="text-2xl md:text-4xl font-bold bg-transparent border-b border-transparent hover:border-blue-400 focus:border-white focus:outline-none w-full transition-colors placeholder-blue-300 pb-1" placeholder="Titel..." />
-              <input type="text" v-model="appSubtitle" class="text-blue-100 text-sm md:text-lg bg-transparent border-b border-transparent hover:border-blue-400 focus:border-blue-200 focus:outline-none w-full transition-colors mt-1 placeholder-blue-300 pb-1" placeholder="Ondertitel..." />
-              
-              <input v-if="isEditingDate" type="date" v-model="appDate" @blur="isEditingDate = false" @keydown.enter="isEditingDate = false" ref="dateInput" class="mt-2 text-gray-800 text-sm px-2 py-1 rounded w-full max-w-xs outline-none focus:ring-2 focus:ring-blue-300 shadow-inner block" />
-              <div v-else @click="startEditingDate" class="text-blue-200/80 text-xs md:text-sm bg-transparent border-b border-transparent hover:border-blue-400 transition-colors mt-1 pb-1 italic cursor-pointer inline-block" title="Klik om een datum te kiezen">
-                {{ formatDateToDutch(appDate) }}
+        <header class="mb-6 md:mb-8 flex flex-col gap-6 bg-blue-600 text-white p-4 md:p-8 rounded-xl shadow-lg border-b-4 border-blue-700">
+          <div class="flex flex-col md:flex-row items-start md:items-center gap-4 w-full justify-between">
+            <div class="flex items-center gap-4 w-full">
+              <i data-lucide="bus" class="w-10 h-10 md:w-14 md:h-14 flex-shrink-0 text-blue-100 drop-shadow-md"></i>
+              <div class="flex-grow w-full">
+                <input type="text" v-model="appTitle" class="text-xl md:text-4xl font-bold bg-transparent border-b border-transparent hover:border-blue-400 focus:border-white focus:outline-none w-full transition-colors placeholder-blue-300 pb-1" placeholder="Titel..." />
+                <input type="text" v-model="appSubtitle" class="text-blue-100 text-sm md:text-lg bg-transparent border-b border-transparent hover:border-blue-400 focus:border-blue-200 focus:outline-none w-full transition-colors mt-1 placeholder-blue-300 pb-1" placeholder="Ondertitel..." />
+                
+                <input v-if="isEditingDate" type="date" v-model="appDate" @blur="isEditingDate = false" @keydown.enter="isEditingDate = false" ref="dateInput" class="mt-2 text-gray-800 text-sm px-2 py-1 rounded w-full max-w-xs outline-none focus:ring-2 focus:ring-blue-300 shadow-inner block" />
+                <div v-else @click="startEditingDate" class="text-blue-200/80 text-xs md:text-sm bg-transparent border-b border-transparent hover:border-blue-400 transition-colors mt-1 pb-1 italic cursor-pointer inline-block" title="Klik om een datum te kiezen">
+                  {{ formatDateToDutch(appDate) }}
+                </div>
               </div>
             </div>
           </div>
           
-          <div class="grid grid-cols-2 md:grid-cols-4 w-full gap-4 items-stretch">
-            <div class="bg-blue-700/60 border-2 border-blue-100/50 p-4 rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-105 hover:bg-blue-800/80 hover:border-white cursor-default shadow-sm">
+          <div class="grid grid-cols-2 lg:grid-cols-4 w-full gap-3 md:gap-4 items-stretch">
+            <div class="bg-blue-700/60 border-2 border-blue-100/50 p-3 md:p-4 rounded-xl md:rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-[1.02] hover:bg-blue-800/80 hover:border-white cursor-default shadow-sm">
               <p class="text-blue-200 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1"># Groepen</p>
               <p class="text-xl md:text-3xl font-black truncate leading-none">
                 {{ remainingGroups }} <span class="text-xs md:text-sm font-normal text-blue-300 opacity-80">/ {{ globalOptions.length }}</span>
               </p>
             </div>
-            <div class="bg-blue-700/60 border-2 border-blue-100/50 p-4 rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-105 hover:bg-blue-800/80 hover:border-white cursor-default shadow-sm">
+            <div class="bg-blue-700/60 border-2 border-blue-100/50 p-3 md:p-4 rounded-xl md:rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-[1.02] hover:bg-blue-800/80 hover:border-white cursor-default shadow-sm">
               <p class="text-blue-200 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1">Vrije Plaatsen</p>
               <p class="text-xl md:text-3xl font-black truncate leading-none">
                 {{ remainingSeats }} <span class="text-xs md:text-sm font-normal text-blue-300 opacity-80">/ {{ totalCapacity }}</span>
               </p>
             </div>
-            <div class="bg-blue-700/60 border-2 border-blue-100/50 p-4 rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-105 hover:bg-blue-800/80 hover:border-white shadow-sm">
+            <div class="bg-blue-700/60 border-2 border-blue-100/50 p-3 md:p-4 rounded-xl md:rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-[1.02] hover:bg-blue-800/80 hover:border-white shadow-sm">
               <p class="text-blue-200 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1">Vertrek</p>
               <input type="time" v-model="departureTime" style="color-scheme: dark" class="bg-transparent text-xl md:text-3xl font-black text-white outline-none focus:ring-0 cursor-pointer w-full leading-none" />
             </div>
-            <div class="bg-blue-700/60 border-2 border-blue-100/50 p-4 rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-105 hover:bg-blue-800/80 hover:border-white shadow-sm">
+            <div class="bg-blue-700/60 border-2 border-blue-100/50 p-3 md:p-4 rounded-xl md:rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-[1.02] hover:bg-blue-800/80 hover:border-white shadow-sm">
               <p class="text-blue-200 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1">Aankomst</p>
               <input type="time" v-model="arrivalTime" style="color-scheme: dark" class="bg-transparent text-xl md:text-3xl font-black text-white outline-none focus:ring-0 cursor-pointer w-full leading-none" />
             </div>
           </div>
         </header>
 
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-8 transition-all hover:shadow-md">
-          <div class="flex items-center gap-2 mb-2 text-gray-800">
-            <i data-lucide="settings" class="text-blue-600 w-5 h-5"></i>
-            <h2 class="text-lg font-bold flex items-center gap-2">Dropdown Opties Beheren <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">{{ globalOptions.length }}</span></h2>
+        <div class="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-gray-200 mb-6 md:mb-8 transition-all">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
+            <div>
+              <div class="flex items-center gap-2 mb-1 text-gray-800">
+                <i data-lucide="settings" class="text-blue-600 w-5 h-5"></i>
+                <h2 class="text-lg font-bold flex items-center gap-2">Dropdown Opties <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">{{ globalOptions.length }}</span></h2>
+              </div>
+              <p class="text-xs md:text-sm text-gray-600">Vul hier alle klassen of groepen in (gescheiden door komma's).</p>
+            </div>
+            <button @click="resetAllData" class="flex items-center justify-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors w-full md:w-auto">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i> Reset alle gegevens
+            </button>
           </div>
-          <p class="text-sm text-gray-600 mb-3">Vul namen in (gescheiden door komma's).</p>
           <textarea v-model="dropdownText" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all" rows="2" placeholder="Bijv: 3BOa, 3BOb..."></textarea>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
           <div v-for="bus in buses" :key="bus.id" class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col transition-all hover:shadow-lg">
             
-            <div class="bg-sky-500 text-white p-4 flex justify-between items-center border-b-2 border-sky-600">
-              <h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="bus" class="w-6 h-6"></i> {{ bus.name }}</h2>
-              <button @click="handlePrint(bus.id)" class="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium shadow-sm">
+            <div class="bg-sky-500 text-white p-3 md:p-4 flex justify-between items-center border-b-2 border-sky-600">
+              <h2 class="text-lg md:text-xl font-bold flex items-center gap-2"><i data-lucide="bus" class="w-5 h-5 md:w-6 md:h-6"></i> {{ bus.name }}</h2>
+              <button @click="handlePrint(bus.id)" class="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors text-xs md:text-sm font-medium shadow-sm">
                 <i data-lucide="printer" class="w-4 h-4"></i> Print
               </button>
             </div>
             
-            <div class="p-5 flex-grow flex flex-col gap-5">
-              <div class="bg-sky-50 p-4 rounded-lg border border-sky-100 flex justify-between items-center transition-all hover:bg-sky-100/50">
-                <label class="text-sm font-semibold text-sky-900">Aantal zitplaatsen</label>
-                <input type="number" min="0" v-model.number="bus.capacity" @focus="$event.target.select()" class="w-24 px-2 py-1 border border-sky-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 font-bold text-center transition-all" />
+            <div class="p-3 md:p-5 flex-grow flex flex-col gap-4 md:gap-5">
+              <div class="bg-sky-50 p-3 md:p-4 rounded-lg border border-sky-100 flex justify-between items-center transition-all hover:bg-sky-100/50">
+                <label class="text-xs md:text-sm font-semibold text-sky-900">Aantal zitplaatsen</label>
+                <input type="number" min="0" v-model.number="bus.capacity" @focus="$event.target.select()" class="w-16 md:w-24 px-2 py-1 border border-sky-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 font-bold text-center transition-all text-sm md:text-base" />
               </div>
               
               <div class="flex-grow">
-                <div class="flex justify-between items-end border-b border-gray-200 pb-1 mb-3">
-                  <h3 class="font-semibold text-gray-700 flex items-center gap-2">
-                    Groepen Indeling 
+                <div class="flex justify-between items-end border-b border-gray-200 pb-1 mb-2 md:mb-3">
+                  <h3 class="font-semibold text-gray-700 flex items-center gap-2 text-sm md:text-base">
+                    Indeling 
                     <span class="bg-sky-100 text-sky-800 text-xs px-2 py-0.5 rounded-full">{{ getValidGroupsCount(bus) }}</span>
                   </h3>
-                  <span class="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded">
-                    <i data-lucide="check-circle-2" class="w-3 h-3"></i> Auto-save
+                  <span class="flex items-center gap-1 text-[10px] md:text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded">
+                    <i data-lucide="check-circle-2" class="w-3 h-3"></i> Opgeslagen
                   </span>
                 </div>
                 
@@ -154,28 +163,28 @@
                   <option v-for="opt in availableOptions" :key="opt" :value="opt"></option>
                 </datalist>
                 
-                <div class="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1 pb-2">
-                  <div v-for="(group, index) in bus.groups" :key="group.id" class="flex gap-2 items-center group/row">
-                    <input :list="'options-' + bus.id" v-model="group.name" @input="checkAddRow(bus)" @blur="handleLearnOption(group.name)" placeholder="Naam groep..." class="flex-grow min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm bg-white transition-all focus:shadow-inner" />
-                    <input type="number" placeholder="Aantal" min="1" v-model="group.count" @input="checkAddRow(bus)" @focus="$event.target.select()" class="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm transition-all focus:shadow-inner" />
+                <div class="flex flex-col gap-2 max-h-48 md:max-h-64 overflow-y-auto pr-1 pb-2">
+                  <div v-for="(group, index) in bus.groups" :key="group.id" class="flex gap-1 md:gap-2 items-center group/row">
+                    <input :list="'options-' + bus.id" v-model="group.name" @input="checkAddRow(bus)" @blur="handleLearnOption(group.name)" placeholder="Groep..." class="flex-grow w-1/2 min-w-0 px-2 md:px-3 py-1.5 md:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs md:text-sm bg-white transition-all focus:shadow-inner" />
+                    <input type="number" placeholder="#" min="1" v-model="group.count" @input="checkAddRow(bus)" @focus="$event.target.select()" class="w-14 md:w-24 px-2 md:px-3 py-1.5 md:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs md:text-sm transition-all focus:shadow-inner" />
                     
-                    <button v-if="!(index === bus.groups.length - 1 && group.name === '' && group.count === '')" @click="handleRemoveGroup(bus, group.id)" class="text-red-400 hover:text-red-600 transition-colors p-1 opacity-40 group-hover/row:opacity-100" title="Verwijder regel">
-                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <button v-if="!(index === bus.groups.length - 1 && group.name === '' && group.count === '')" @click="handleRemoveGroup(bus, group.id)" class="text-red-400 hover:text-red-600 transition-colors p-1 md:opacity-40 group-hover/row:opacity-100" title="Verwijder regel">
+                      <i data-lucide="trash-2" class="w-4 h-4 md:w-5 md:h-5"></i>
                     </button>
-                    <div v-else class="w-6"></div>
+                    <div v-else class="w-6 md:w-7"></div>
                   </div>
                 </div>
               </div>
             </div>
             
-            <div :class="['p-4 border-t flex justify-between items-center', getFreeSeats(bus) < 0 ? 'bg-red-50' : 'bg-slate-50']">
+            <div :class="['p-3 md:p-4 border-t flex justify-between items-center', getFreeSeats(bus) < 0 ? 'bg-red-50' : 'bg-slate-50']">
               <div>
-                <p class="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Bezetting</p>
-                <p class="font-bold text-gray-800">{{ getTotalUsed(bus) }} / {{ bus.capacity || 0 }}</p>
+                <p class="text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest">Bezetting</p>
+                <p class="font-bold text-gray-800 text-sm md:text-base">{{ getTotalUsed(bus) }} / {{ bus.capacity || 0 }}</p>
               </div>
               <div :class="['text-right', getFreeSeats(bus) < 0 ? 'text-red-600' : 'text-green-600']">
-                <p class="text-[10px] uppercase font-bold tracking-widest">Vrij</p>
-                <div class="flex items-center gap-1 font-black text-xl leading-none">
+                <p class="text-[9px] md:text-[10px] uppercase font-bold tracking-widest">Vrij</p>
+                <div class="flex items-center gap-1 font-black text-lg md:text-xl leading-none">
                   <i v-if="getFreeSeats(bus) < 0" data-lucide="alert-circle" class="w-4 h-4"></i>
                   {{ getFreeSeats(bus) }}
                 </div>
@@ -224,7 +233,7 @@
         
         const buses = ref(savedBuses);
 
-        // Auto-save logic met Vue Watchers
+        // Auto-save logic met Vue Watchers (Dit zorgt voor de functionaliteit met de Local Storage)
         watch(appTitle, (val) => localStorage.setItem('bus_appTitle', val));
         watch(appSubtitle, (val) => localStorage.setItem('bus_appSubtitle', val));
         watch(appDate, (val) => localStorage.setItem('bus_appDate', val));
@@ -294,6 +303,14 @@
           printingBusId.value = busId;
           setTimeout(() => { window.print(); }, 100);
         };
+        
+        // Nieuwe Reset Functie
+        const resetAllData = () => {
+          if (confirm("Weet je zeker dat je alle bussen, indelingen en groepen wilt wissen? Dit kan niet ongedaan worden gemaakt.")) {
+            localStorage.clear();
+            window.location.reload();
+          }
+        };
 
         onMounted(() => {
           lucide.createIcons();
@@ -308,7 +325,7 @@
           appTitle, appSubtitle, appDate, isEditingDate, departureTime, arrivalTime, dropdownText, buses, printingBusId, dateInput,
           globalOptions, availableOptions, totalCapacity, remainingSeats, remainingGroups,
           busToPrint, printValidGroups, printTotalUsed, printFreeSeats,
-          formatDateToDutch, startEditingDate, getTotalUsed, getFreeSeats, getValidGroupsCount, checkAddRow, handleRemoveGroup, handleLearnOption, handlePrint
+          formatDateToDutch, startEditingDate, getTotalUsed, getFreeSeats, getValidGroupsCount, checkAddRow, handleRemoveGroup, handleLearnOption, handlePrint, resetAllData
         };
       }
     }).mount('#app');
