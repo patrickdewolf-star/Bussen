@@ -1,0 +1,301 @@
+import React, { useState, useEffect } from 'react';
+import { Bus, Printer, Trash2, AlertCircle, Settings, CheckCircle2, ArrowLeft } from 'lucide-react';
+
+// Formatteer een datum naar voluit geschreven Nederlands (bijv. "woensdag 28 januari 2026")
+const formatDateToDutch = (dateStr) => {
+  if (!dateStr) return 'Klik hier om een datum te kiezen...';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Klik hier om een datum te kiezen...';
+    return date.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  } catch (e) {
+    return 'Klik hier om een datum te kiezen...';
+  }
+};
+
+// Veilige opslag functies
+const safeGetItem = (key, defaultValue) => {
+  try {
+    return localStorage.getItem(key) || defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+};
+
+const safeSetItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+  }
+};
+
+// --- Hoofdcomponent ---
+export default function App() {
+  const [appTitle, setAppTitle] = useState(() => safeGetItem('bus_appTitle', 'DON BOSCO FEEST'));
+  const [appSubtitle, setAppSubtitle] = useState(() => safeGetItem('bus_appSubtitle', 'BUSVERDELING DERDEjaars'));
+  const [appDate, setAppDate] = useState(() => safeGetItem('bus_appDate', ''));
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  
+  const [departureTime, setDepartureTime] = useState(() => safeGetItem('bus_departureTime', '08:00'));
+  const [arrivalTime, setArrivalTime] = useState(() => safeGetItem('bus_arrivalTime', '17:00'));
+
+  const [dropdownText, setDropdownText] = useState(() => safeGetItem('bus_dropdownText', '3BOa, 3BOb, 3BSa, 3BSb, 3BW, 3MWW, 3GT, 3MWa, 3MWb, 3TW, 3OLa, 3OLb, 3OLc, 3SPa, 3SPb, 3SW, 3ZWa, 3ZWb'));
+
+  const [buses, setBuses] = useState(() => {
+    try {
+      const savedBuses = safeGetItem('bus_buses', null);
+      if (savedBuses) {
+        return JSON.parse(savedBuses);
+      }
+    } catch (e) {
+      console.error("Kon bussen niet laden uit geheugen", e);
+    }
+    return [
+      { id: 1, name: 'Bus 1', capacity: 50, groups: [{ id: '1-init', name: '', count: '' }] },
+      { id: 2, name: 'Bus 2', capacity: 50, groups: [{ id: '2-init', name: '', count: '' }] },
+      { id: 3, name: 'Bus 3', capacity: 50, groups: [{ id: '3-init', name: '', count: '' }] },
+      { id: 4, name: 'Bus 4', capacity: 50, groups: [{ id: '4-init', name: '', count: '' }] },
+      { id: 5, name: 'Bus 5', capacity: 50, groups: [{ id: '5-init', name: '', count: '' }] },
+    ];
+  });
+
+  useEffect(() => { safeSetItem('bus_appTitle', appTitle); }, [appTitle]);
+  useEffect(() => { safeSetItem('bus_appSubtitle', appSubtitle); }, [appSubtitle]);
+  useEffect(() => { safeSetItem('bus_appDate', appDate); }, [appDate]);
+  useEffect(() => { safeSetItem('bus_departureTime', departureTime); }, [departureTime]);
+  useEffect(() => { safeSetItem('bus_arrivalTime', arrivalTime); }, [arrivalTime]);
+  useEffect(() => { safeSetItem('bus_dropdownText', dropdownText); }, [dropdownText]);
+  useEffect(() => { safeSetItem('bus_buses', JSON.stringify(buses)); }, [buses]);
+
+  const [printingBusId, setPrintingBusId] = useState(null);
+
+  useEffect(() => {
+    const handleAfterPrint = () => setPrintingBusId(null);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, []);
+
+  const globalOptions = dropdownText.split(',').map(s => s.trim()).filter(Boolean);
+  const usedGroupNames = buses.flatMap(bus => bus.groups.map(g => g.name.trim())).filter(Boolean);
+  const availableOptions = globalOptions.filter(opt => !usedGroupNames.includes(opt));
+
+  const totalCapacity = buses.reduce((sum, b) => sum + (parseInt(b.capacity) || 0), 0);
+  const totalUsedSeats = buses.flatMap(b => b.groups).reduce((sum, g) => sum + (parseInt(g.count) || 0), 0);
+  const remainingSeats = totalCapacity - totalUsedSeats;
+  const remainingGroups = availableOptions.length;
+
+  const handleUpdateCapacity = (busId, newCapacity) => {
+    setBuses(buses.map(bus => {
+      if (bus.id !== busId) return bus;
+      const val = newCapacity === '' ? '' : parseInt(newCapacity);
+      return { ...bus, capacity: isNaN(val) ? '' : val };
+    }));
+  };
+
+  const handleUpdateGroup = (busId, groupId, field, value) => {
+    setBuses(prevBuses => prevBuses.map(bus => {
+      if (bus.id !== busId) return bus;
+      let newGroups = bus.groups.map(g => g.id === groupId ? { ...g, [field]: value } : g);
+      const lastGroup = newGroups[newGroups.length - 1];
+      if (lastGroup && (lastGroup.name !== '' || lastGroup.count !== '')) {
+        newGroups.push({ id: Date.now() + Math.random(), name: '', count: '' });
+      }
+      return { ...bus, groups: newGroups };
+    }));
+  };
+
+  const handleRemoveGroup = (busId, groupId) => {
+    setBuses(prevBuses => prevBuses.map(bus => {
+      if (bus.id !== busId) return bus;
+      let newGroups = bus.groups.filter(g => g.id !== groupId);
+      if (newGroups.length === 0 || (newGroups[newGroups.length - 1].name !== '' || newGroups[newGroups.length - 1].count !== '')) {
+         newGroups.push({ id: Date.now() + Math.random(), name: '', count: '' });
+      }
+      return { ...bus, groups: newGroups };
+    }));
+  };
+
+  const handleLearnOption = (name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setDropdownText(prev => {
+      const currentOptions = prev.split(',').map(s => s.trim()).filter(Boolean);
+      if (!currentOptions.includes(trimmed)) {
+        return prev ? `${prev}, ${trimmed}` : trimmed;
+      }
+      return prev;
+    });
+  };
+
+  const handlePrint = (busId) => {
+    setPrintingBusId(busId);
+    setTimeout(() => window.print(), 100);
+  };
+
+  if (printingBusId) {
+    const busToPrint = buses.find(b => b.id === printingBusId);
+    const validGroups = busToPrint.groups.filter(g => g.name.trim() !== '' || g.count !== '');
+    const totalUsed = validGroups.reduce((sum, g) => sum + (parseInt(g.count) || 0), 0);
+    const freeSeats = (parseInt(busToPrint.capacity) || 0) - totalUsed;
+
+    return (
+      <div className="p-8 max-w-2xl mx-auto bg-white text-black font-sans">
+        <div className="print:hidden mb-8">
+          <button onClick={() => setPrintingBusId(null)} className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors font-medium">
+            <ArrowLeft size={18} /> Terug naar overzicht
+          </button>
+        </div>
+        <div className="flex items-center justify-between border-b-2 border-black pb-4 mb-6">
+          <h1 className="text-4xl font-bold flex items-center gap-3"><Bus size={40} /> {busToPrint.name}</h1>
+          <div className="text-right">
+            <p className="text-gray-800 font-bold">{appTitle}</p>
+            {appSubtitle && <p className="text-gray-600 text-sm">{appSubtitle}</p>}
+            {appDate && <p className="text-gray-500 text-xs italic">{formatDateToDutch(appDate)}</p>}
+            <p className="text-gray-800 text-xs mt-1 font-semibold">Vertrek: {departureTime} | Aankomst: {arrivalTime}</p>
+            <p className="text-xs mt-1 text-gray-400">Geprint op: {new Date().toLocaleDateString('nl-NL')}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4 mb-8 bg-gray-100 p-4 rounded-lg font-semibold text-lg">
+          <div className="text-center"><p className="text-gray-500 text-sm">Totale Capaciteit</p><p>{busToPrint.capacity}</p></div>
+          <div className="text-center"><p className="text-gray-500 text-sm">Bezette Plaatsen</p><p>{totalUsed}</p></div>
+          <div className="text-center"><p className="text-gray-500 text-sm">Vrije Plaatsen</p><p className={freeSeats < 0 ? 'text-red-600' : 'text-green-600'}>{freeSeats}</p></div>
+        </div>
+        <h2 className="text-2xl font-bold mb-4">Ingedeelde Groepen</h2>
+        {validGroups.length > 0 ? (
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b-2 border-gray-300"><th className="py-2">Groepsnaam</th><th className="py-2 text-right">Aantal Deelnemers</th></tr>
+            </thead>
+            <tbody>
+              {validGroups.map(group => (
+                <tr key={group.id} className="border-b border-gray-200"><td className="py-2">{group.name || '- Geen naam -'}</td><td className="py-2 text-right">{group.count}</td></tr>
+              ))}
+              <tr className="font-bold bg-gray-50"><td className="py-2 text-right">Totaal ({validGroups.length} groepen):</td><td className="py-2 text-right">{totalUsed}</td></tr>
+            </tbody>
+          </table>
+        ) : <p className="text-gray-500 italic">Er zijn nog geen groepen aan deze bus toegewezen.</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-4 md:p-8 font-sans text-gray-900 transition-all">
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-8 flex flex-col gap-6 bg-blue-600 text-white p-6 md:p-8 rounded-xl shadow-lg border-b-4 border-blue-700">
+          <div className="flex items-center gap-4 md:gap-6 w-full">
+            <Bus size={56} className="flex-shrink-0 hidden md:block text-blue-100 drop-shadow-md" />
+            <Bus size={40} className="flex-shrink-0 md:hidden text-blue-100" />
+            <div className="flex-grow w-full">
+              <input type="text" value={appTitle} onChange={(e) => setAppTitle(e.target.value)} className="text-2xl md:text-4xl font-bold bg-transparent border-b border-transparent hover:border-blue-400 focus:border-white focus:outline-none w-full transition-colors placeholder-blue-300 pb-1" placeholder="Titel..." />
+              <input type="text" value={appSubtitle} onChange={(e) => setAppSubtitle(e.target.value)} className="text-blue-100 text-sm md:text-lg bg-transparent border-b border-transparent hover:border-blue-400 focus:border-blue-200 focus:outline-none w-full transition-colors mt-1 placeholder-blue-300 pb-1" placeholder="Ondertitel..." />
+              {isEditingDate ? (
+                <input type="date" autoFocus value={appDate} onChange={(e) => setAppDate(e.target.value)} onBlur={() => setIsEditingDate(false)} onKeyDown={(e) => e.key === 'Enter' && setIsEditingDate(false)} className="mt-2 text-gray-800 text-sm px-2 py-1 rounded w-full max-w-xs outline-none focus:ring-2 focus:ring-blue-300 shadow-inner block" />
+              ) : (
+                <div onClick={() => setIsEditingDate(true)} className="text-blue-200/80 text-xs md:text-sm bg-transparent border-b border-transparent hover:border-blue-400 transition-colors mt-1 pb-1 italic cursor-pointer inline-block" title="Klik om een datum te kiezen">{formatDateToDutch(appDate)}</div>
+              )}
+            </div>
+          </div>
+          
+          {/* Statistieken Sectie met Duidelijke Kaders en Hover */}
+          <div className="grid grid-cols-2 md:grid-cols-4 w-full gap-4 items-stretch">
+            {/* Groepen Kader */}
+            <div className="bg-blue-700/60 border-2 border-blue-100/50 p-4 rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-105 hover:bg-blue-800/80 hover:border-white cursor-default shadow-sm">
+              <p className="text-blue-200 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1"># Groepen</p>
+              <p className="text-xl md:text-3xl font-black truncate leading-none">
+                {remainingGroups} <span className="text-xs md:text-sm font-normal text-blue-300 opacity-80">/ {globalOptions.length}</span>
+              </p>
+            </div>
+            
+            {/* Plaatsen Kader */}
+            <div className="bg-blue-700/60 border-2 border-blue-100/50 p-4 rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-105 hover:bg-blue-800/80 hover:border-white cursor-default shadow-sm">
+              <p className="text-blue-200 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1">Vrije Plaatsen</p>
+              <p className="text-xl md:text-3xl font-black truncate leading-none">
+                {remainingSeats} <span className="text-xs md:text-sm font-normal text-blue-300 opacity-80">/ {totalCapacity}</span>
+              </p>
+            </div>
+            
+            {/* Vertrek Kader */}
+            <div className="bg-blue-700/60 border-2 border-blue-100/50 p-4 rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-105 hover:bg-blue-800/80 hover:border-white shadow-sm">
+              <p className="text-blue-200 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1">Vertrek</p>
+              <input type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} style={{ colorScheme: 'dark' }} className="bg-transparent text-xl md:text-3xl font-black text-white outline-none focus:ring-0 cursor-pointer w-full leading-none" />
+            </div>
+            
+            {/* Aankomst Kader */}
+            <div className="bg-blue-700/60 border-2 border-blue-100/50 p-4 rounded-2xl flex flex-col justify-center transition-all duration-200 hover:scale-105 hover:bg-blue-800/80 hover:border-white shadow-sm">
+              <p className="text-blue-200 text-[10px] md:text-xs uppercase font-bold tracking-widest mb-1">Aankomst</p>
+              <input type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} style={{ colorScheme: 'dark' }} className="bg-transparent text-xl md:text-3xl font-black text-white outline-none focus:ring-0 cursor-pointer w-full leading-none" />
+            </div>
+          </div>
+        </header>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-8 transition-all hover:shadow-md">
+          <div className="flex items-center gap-2 mb-2 text-gray-800">
+            <Settings size={20} className="text-blue-600"/>
+            <h2 className="text-lg font-bold flex items-center gap-2">Dropdown Opties Beheren <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">{globalOptions.length}</span></h2>
+          </div>
+          <p className="text-sm text-gray-600 mb-3">Vul namen in (gescheiden door komma's).</p>
+          <textarea value={dropdownText} onChange={(e) => setDropdownText(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all" rows="2" placeholder="Bijv: 3BOa, 3BOb..." />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {buses.map(bus => (
+            <BusCard key={bus.id} bus={bus} availableOptions={availableOptions} onUpdateCapacity={handleUpdateCapacity} onUpdateGroup={handleUpdateGroup} onRemoveGroup={handleRemoveGroup} onLearnOption={handleLearnOption} onPrint={handlePrint} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BusCard({ bus, availableOptions, onUpdateCapacity, onUpdateGroup, onRemoveGroup, onLearnOption, onPrint }) {
+  const busCapacity = parseInt(bus.capacity) || 0;
+  const totalUsed = bus.groups.reduce((sum, group) => sum + (parseInt(group.count) || 0), 0);
+  const freeSeats = busCapacity - totalUsed;
+  const isOverbooked = freeSeats < 0;
+  const validGroupsCount = bus.groups.filter(g => g.name.trim() !== '' || g.count !== '').length;
+  const datalistId = `options-${bus.id}`;
+
+  return (
+    <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col transition-all hover:shadow-lg">
+      <div className="bg-sky-500 text-white p-4 flex justify-between items-center border-b-2 border-sky-600">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Bus size={24} /> {bus.name}</h2>
+        <button onClick={() => onPrint(bus.id)} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium shadow-sm"><Printer size={16} /> Print</button>
+      </div>
+      <div className="p-5 flex-grow flex flex-col gap-5">
+        <div className="bg-sky-50 p-4 rounded-lg border border-sky-100 flex justify-between items-center transition-all hover:bg-sky-100/50">
+          <label className="text-sm font-semibold text-sky-900">Aantal zitplaatsen</label>
+          <input type="number" min="0" value={bus.capacity} onChange={(e) => onUpdateCapacity(bus.id, e.target.value)} onFocus={(e) => e.target.select()} className="w-24 px-2 py-1 border border-sky-200 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 font-bold text-center transition-all" />
+        </div>
+        <div className="flex-grow">
+          <div className="flex justify-between items-end border-b border-gray-200 pb-1 mb-3">
+            <h3 className="font-semibold text-gray-700 flex items-center gap-2">Groepen Indeling <span className="bg-sky-100 text-sky-800 text-xs px-2 py-0.5 rounded-full">{validGroupsCount}</span></h3>
+            <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-1 rounded"><CheckCircle2 size={12} /> Auto-save</span>
+          </div>
+          <datalist id={datalistId}>{availableOptions.map(opt => <option key={opt} value={opt} />)}</datalist>
+          <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1 pb-2">
+            {bus.groups.map((group, index) => {
+              const isLast = index === bus.groups.length - 1;
+              const isEmpty = group.name === '' && group.count === '';
+              return (
+                <div key={group.id} className="flex gap-2 items-center group/row">
+                  <input list={datalistId} value={group.name} onChange={(e) => onUpdateGroup(bus.id, group.id, 'name', e.target.value)} onBlur={(e) => onLearnOption(e.target.value)} placeholder="Naam groep..." className="flex-grow min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm bg-white transition-all focus:shadow-inner" />
+                  <input type="number" placeholder="Aantal" min="1" value={group.count} onChange={(e) => onUpdateGroup(bus.id, group.id, 'count', e.target.value)} onFocus={(e) => e.target.select()} className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm transition-all focus:shadow-inner" />
+                  {(!isLast || !isEmpty) ? (
+                    <button type="button" onClick={() => onRemoveGroup(bus.id, group.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 opacity-40 group-hover/row:opacity-100" title="Verwijder regel"><Trash2 size={16} /></button>
+                  ) : <div className="w-6"></div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className={`p-4 border-t flex justify-between items-center ${isOverbooked ? 'bg-red-50' : 'bg-slate-50'}`}>
+        <div><p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Bezetting</p><p className="font-bold text-gray-800">{totalUsed} / {busCapacity}</p></div>
+        <div className={`text-right ${isOverbooked ? 'text-red-600' : 'text-green-600'}`}>
+          <p className="text-[10px] uppercase font-bold tracking-widest">Vrij</p>
+          <div className="flex items-center gap-1 font-black text-xl leading-none">{isOverbooked && <AlertCircle size={18} />}{freeSeats}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
